@@ -1,4 +1,4 @@
-<title>Kampala Drain Watch</title>
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="description" content="Open maintenance map for Greater Kampala's drainage channels. Credit: Gava Charles."><style>:root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0;font:14px system-ui,sans-serif;background:#f4f2ee}img{max-width:100%}[hidden]{display:none!important}</style></head><body><title>Kampala Drain Watch</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Source+Sans+3:wght@400;600;700&family=JetBrains+Mono:wght@400;600&display=swap">
 <style>
@@ -29,6 +29,7 @@ header.top h1 { font: 700 26px/1 var(--display); letter-spacing: .02em; margin: 
 header.top .sub { color: var(--muted); font-size: 13px }
 .app { grid-template-rows: auto minmax(0, 1fr) }
 .app > * { min-width: 0 }
+[hidden] { display: none !important }
 .pane { overflow-wrap: anywhere }
 #map { min-height: 0; background: var(--bg) }
 aside { min-width: 0; min-height: 0; overflow: auto; background: var(--panel); border-left: 1px solid var(--line) }
@@ -45,6 +46,7 @@ aside { min-width: 0; min-height: 0; overflow: auto; background: var(--panel); b
   .tabs { overflow-x: auto } .tabs button { white-space: nowrap; padding-inline: 8px }
   .legend { max-width: 180px; font-size: 11px }
   .syslab { font-size: 14px }
+  .leaflet-control-attribution { font-size: 9px; max-width: 70%; white-space: normal; line-height: 1.25 }
   aside { border-left: 0; border-top: 1px solid var(--line); overflow: visible }
 }
 .tabs { display: flex; gap: 2px; position: sticky; top: 0; background: var(--panel); z-index: 2;
@@ -145,8 +147,10 @@ button[disabled] { opacity: .5; cursor: not-allowed }
       <p><b>Urgent</b>: high priority and still worsening. <b>Fix now</b>: high priority, stable. <b>Coming</b>: rising risk, not yet high. <b>Watch</b>: middle on both.</p>
       <h3>Field reports</h3>
       <p>Reports are shared with everyone who opens this page. They build the flood and blockage record that keeps the rankings honest.</p>
+      <h3>Background map</h3>
+      <p>Zoom in and the background switches to satellite imagery so you can see the actual channel, roofs and roads. Use the buttons in the legend to choose relief, satellite or street map yourself.</p>
       <h3>Sources</h3>
-      <p class="credit">Channels, culverts, waste points, places: © OpenStreetMap contributors · buildings: Microsoft Global ML Building Footprints · built-up and population: JRC GHSL R2023A · relief: Copernicus GLO-30 DEM · wetland: ESA WorldCover 2021 · radar: ESA Copernicus Sentinel-1 · hotspots: KCCA/NEMA lists, news and local reports. Analysis and tool: Gava Charles.</p>
+      <p class="credit">Channels, culverts, waste points, places: © OpenStreetMap contributors · buildings: Microsoft Global ML Building Footprints · built-up and population: JRC GHSL R2023A · relief: Copernicus GLO-30 DEM · wetland: ESA WorldCover 2021 · radar: ESA Copernicus Sentinel-1 · hotspots: KCCA/NEMA lists, news and local reports. Satellite imagery: Esri World Imagery (Esri, Maxar, Earthstar Geographics) · street map: © OpenStreetMap contributors. Analysis and tool: Gava Charles.</p>
     </section>
   </aside>
 </div>
@@ -175,6 +179,22 @@ button[disabled] { opacity: .5; cursor: not-allowed }
   setTimeout(() => map.invalidateSize(), 300);
   map.attributionControl.setPrefix(false).addAttribution("© OpenStreetMap contributors · Copernicus · JRC GHSL · Microsoft · Gava Charles");
   let base = L.imageOverlay(dark() ? "basemap_dark.png" : "basemap_light.png", [[0.20, 32.45], [0.42, 32.72]], { opacity: 1 }).addTo(map);
+  // satellite imagery: switches on automatically when zoomed in (and can be chosen any time)
+  const sat = L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+    { maxZoom: 19, maxNativeZoom: 18, attribution: "Imagery © Esri, Maxar, Earthstar Geographics" });
+  const streets = L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+    { maxZoom: 19, attribution: "© OpenStreetMap contributors" });
+  let baseMode = "auto";
+  function applyBase() {
+    const z = map.getZoom(), want = baseMode === "auto" ? (z >= 14.5 ? "sat" : "relief") : baseMode;
+    [sat, streets].forEach(l => map.hasLayer(l) && l !== { sat, streets }[want] && map.removeLayer(l));
+    if (want === "sat" && !map.hasLayer(sat)) sat.addTo(map).bringToBack();
+    if (want === "streets" && !map.hasLayer(streets)) streets.addTo(map).bringToBack();
+    base.setOpacity(want === "relief" ? 1 : 0);
+    if (want === "relief") casing.remove(); else if (!map.hasLayer(casing)) { casing.addTo(map); lines.forEach(l => l.bringToFront()); }
+    document.querySelectorAll(".bases button").forEach(b => b.setAttribute("aria-pressed", b.dataset.b === baseMode));
+  }
+  map.on("zoomend", applyBase);
   matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => { base.setUrl(dark() ? "basemap_dark.png" : "basemap_light.png"); });
   new MutationObserver(() => base.setUrl(dark() ? "basemap_dark.png" : "basemap_light.png"))
     .observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
@@ -197,6 +217,8 @@ button[disabled] { opacity: .5; cursor: not-allowed }
       { sticky: true, direction: "top", offset: [0, -8] });
     ln.seg = s; lineOf.set(s.i, ln); return ln.addTo(map);
   });
+  const casing = L.layerGroup(segs.map(s => L.polyline(s.c.map(([x, y]) => [y, x]),
+    { color: "#ffffff", weight: weight(s) + 3, opacity: 0.85, interactive: false })));
   const restyle = () => lines.forEach(l => l.setStyle({ color: color(l.seg, mode) }));
   const hsLayer = L.layerGroup(hotspots.map(h => L.circleMarker([h.lat, h.lon], { radius: 7, color: "#e8002a", weight: 2, fill: false })
     .bindTooltip(`${h.place}<br><span style="opacity:.75">${h.evidence}</span>`))).addTo(map);
@@ -215,13 +237,18 @@ button[disabled] { opacity: .5; cursor: not-allowed }
       <button data-m="k" aria-pressed="true">Work class</button><button data-m="p" aria-pressed="false">Priority</button>
       <button data-m="e" aria-pressed="false">Emerging</button></div><div id="lg"></div>
       <div><span class="sw" style="background:none;border:2px solid #e8002a;width:10px;height:10px;border-radius:50%"></span>reported flooding</div>
-      <div><span class="sw" style="background:#0b7a8a;width:10px;height:10px;border-radius:50%"></span>field report</div></div>`;
+      <div><span class="sw" style="background:#0b7a8a;width:10px;height:10px;border-radius:50%"></span>field report</div>
+      <div class="modes bases" role="group" aria-label="Background map"><button data-b="auto" aria-pressed="true">Auto</button>
+      <button data-b="relief" aria-pressed="false">Relief</button><button data-b="sat" aria-pressed="false">Satellite</button>
+      <button data-b="streets" aria-pressed="false">Streets</button></div>
+      <div class="muted" style="font-size:11px">Auto shows satellite imagery when you zoom in.</div></div>`;
     const tg = d.querySelector(".lg-toggle"), bd = d.querySelector(".lg-body");
     tg.onclick = () => { bd.hidden = !bd.hidden; tg.setAttribute("aria-expanded", !bd.hidden); };
-    d.querySelectorAll(".modes button").forEach(b => b.onclick = () => { mode = b.dataset.m;
-      d.querySelectorAll(".modes button").forEach(x => x.setAttribute("aria-pressed", x === b)); restyle(); drawLegend(); });
+    d.querySelectorAll(".modes:not(.bases) button").forEach(b => b.onclick = () => { mode = b.dataset.m;
+      d.querySelectorAll(".modes:not(.bases) button").forEach(x => x.setAttribute("aria-pressed", x === b)); restyle(); drawLegend(); });
+    d.querySelectorAll(".bases button").forEach(b => b.onclick = () => { baseMode = b.dataset.b; applyBase(); });
     return d; } });
-  new Legend({ position: "bottomleft" }).addTo(map);
+  new Legend({ position: touch ? "topright" : "bottomleft" }).addTo(map);
   function drawLegend() {
     const g = $("#lg");
     if (mode === "k") g.innerHTML = Object.entries(CLS).filter(([k]) => k !== "other")
@@ -230,7 +257,7 @@ button[disabled] { opacity: .5; cursor: not-allowed }
       g.innerHTML = `<div class="ramp" style="background:linear-gradient(90deg,${st.map(c => `rgb(${c})`).join(",")})"></div>
         <div class="row" style="justify-content:space-between"><span>low</span><span>${mode === "p" ? "maintenance priority" : "emerging risk"}</span><span>high</span></div>`; }
   }
-  drawLegend();
+  drawLegend(); applyBase();
 
   // ---------------------------------------------------------------- tabs
   document.querySelectorAll(".tabs button").forEach(b => b.onclick = () => {
@@ -434,3 +461,4 @@ button[disabled] { opacity: .5; cursor: not-allowed }
   }
 })();
 </script>
+</body></html>
