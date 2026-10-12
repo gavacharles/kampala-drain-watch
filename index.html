@@ -28,12 +28,15 @@ header.top { grid-column: 1 / -1; display: flex; align-items: baseline; gap: 14p
 header.top h1 { font: 700 26px/1 var(--display); letter-spacing: .02em; margin: 0; text-transform: uppercase }
 header.top .sub { color: var(--muted); font-size: 13px }
 .app { grid-template-rows: auto minmax(0, 1fr) }
+.app > * { min-width: 0 }
+.pane { overflow-wrap: anywhere }
 #map { min-height: 0; background: var(--bg) }
 aside { min-width: 0; min-height: 0; overflow: auto; background: var(--panel); border-left: 1px solid var(--line) }
 .lg-toggle { font: 600 11px var(--body); border: 1px solid var(--line); background: var(--bg); color: var(--ink); border-radius: 999px;
   padding: 2px 10px; cursor: pointer; justify-self: start }
 @media (max-width: 820px) {
-  .app { grid-template-columns: 1fr; grid-template-rows: auto 60vh auto; height: auto }
+  .app { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto 62vh auto; height: auto; width: 100% }
+  aside { width: 100%; box-sizing: border-box }
   header.top { gap: 6px 10px; padding-block: 8px }
   header.top h1 { font-size: 22px }
   header.top .sub { display: none }
@@ -168,7 +171,8 @@ button[disabled] { opacity: .5; cursor: not-allowed }
 
   // ---------------------------------------------------------------- map
   const map = L.map("map", { preferCanvas: true, zoomSnap: 0.25, minZoom: 11, maxZoom: 18, attributionControl: true })
-    .fitBounds([[0.25, 32.50], [0.39, 32.68]]);
+    .fitBounds(matchMedia("(max-width: 820px)").matches ? [[0.27, 32.53], [0.37, 32.65]] : [[0.25, 32.50], [0.39, 32.68]]);
+  setTimeout(() => map.invalidateSize(), 300);
   map.attributionControl.setPrefix(false).addAttribution("© OpenStreetMap contributors · Copernicus · JRC GHSL · Microsoft · Gava Charles");
   let base = L.imageOverlay(dark() ? "basemap_dark.png" : "basemap_light.png", [[0.20, 32.45], [0.42, 32.72]], { opacity: 1 }).addTo(map);
   matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => { base.setUrl(dark() ? "basemap_dark.png" : "basemap_light.png"); });
@@ -181,7 +185,7 @@ button[disabled] { opacity: .5; cursor: not-allowed }
   const byId = new Map(segs.map(s => [s.i, s]));
   let mode = "k", selected = null, hl = null, traceLayer = L.layerGroup().addTo(map);
   const lineOf = new Map();
-  const touch = matchMedia("(pointer: coarse)").matches;
+  const touch = matchMedia("(pointer: coarse)").matches || matchMedia("(max-width: 820px)").matches;
   const esc = t => String(t).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
   const lines = segs.sort((a, b) => a.a - b.a).map(s => {
     const ln = L.polyline(s.c.map(([x, y]) => [y, x]), { color: color(s, mode), weight: weight(s), opacity: 0.95 });
