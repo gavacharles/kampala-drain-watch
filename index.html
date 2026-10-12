@@ -191,7 +191,9 @@ button[disabled] { opacity: .5; cursor: not-allowed }
     if (want === "sat" && !map.hasLayer(sat)) sat.addTo(map).bringToBack();
     if (want === "streets" && !map.hasLayer(streets)) streets.addTo(map).bringToBack();
     base.setOpacity(want === "relief" ? 1 : 0);
-    if (want === "relief") casing.remove(); else if (!map.hasLayer(casing)) { casing.addTo(map); lines.forEach(l => l.bringToFront()); }
+    const onImg = want !== "relief";
+    if (!onImg) casing.remove(); else if (!map.hasLayer(casing)) { casing.addTo(map); lines.forEach(l => l.bringToFront()); }
+    lines.forEach(l => l.setStyle({ weight: weight(l.seg) * (onImg ? 1.6 : 1), opacity: 1 }));
     document.querySelectorAll(".bases button").forEach(b => b.setAttribute("aria-pressed", b.dataset.b === baseMode));
   }
   map.on("zoomend", applyBase);
@@ -212,13 +214,13 @@ button[disabled] { opacity: .5; cursor: not-allowed }
     if (touch) L.polyline(s.c.map(([x, y]) => [y, x]), { color: "#000", opacity: 0, weight: 18 }).on("click", () => select(s.i, false)).addTo(map);
     ln.on("click", () => select(s.i, false));
     ln.on("mouseover", () => { ln.setStyle({ weight: weight(s) + 4 }); ln.bringToFront(); });
-    ln.on("mouseout", () => ln.setStyle({ weight: weight(s) }));
+    ln.on("mouseout", () => ln.setStyle({ weight: weight(s) * (map.hasLayer(casing) ? 1.6 : 1) }));
     ln.bindTooltip(() => `<b>${esc(s.nm)}</b><br>${s.sy ? esc(s.sy) + " catchment · " : ""}priority ${s.p.toFixed(0)} · ${(CLS[s.k] || CLS.other)[0]}`,
       { sticky: true, direction: "top", offset: [0, -8] });
     ln.seg = s; lineOf.set(s.i, ln); return ln.addTo(map);
   });
   const casing = L.layerGroup(segs.map(s => L.polyline(s.c.map(([x, y]) => [y, x]),
-    { color: "#ffffff", weight: weight(s) + 3, opacity: 0.85, interactive: false })));
+    { color: "#ffffff", weight: weight(s) * 1.6 + 2.5, opacity: 0.9, interactive: false })));
   const restyle = () => lines.forEach(l => l.setStyle({ color: color(l.seg, mode) }));
   const hsLayer = L.layerGroup(hotspots.map(h => L.circleMarker([h.lat, h.lon], { radius: 7, color: "#e8002a", weight: 2, fill: false })
     .bindTooltip(`${h.place}<br><span style="opacity:.75">${h.evidence}</span>`))).addTo(map);
